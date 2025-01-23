@@ -1,18 +1,21 @@
-package ru.vatolin.currencyexchange;
-
 import com.google.gson.Gson;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import ru.vatolin.currencyexchange.ExchangeRate;
+import ru.vatolin.currencyexchange.ExchangeRateDao;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @WebServlet(urlPatterns = "/api/exchangeRates/*")
 public class ExchangeRatesServlet extends HttpServlet {
@@ -31,16 +34,13 @@ public class ExchangeRatesServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        
+
         try {
             String pathInfo = request.getPathInfo();
-            
             if (pathInfo == null || pathInfo.equals("/")) {
                 List<ExchangeRate> rates = exchangeRateDao.getAllExchangeRates();
                 response.setStatus(HttpServletResponse.SC_OK);
                 response.getWriter().write(new Gson().toJson(rates));
-            } else if (pathInfo.startsWith("/exchange")) {
-                handleCurrencyExchange(request, response);
             } else {
                 String[] codes = pathInfo.substring(1).split("(?<=\\G.{3})");
                 if (codes.length != 2) {
@@ -62,10 +62,6 @@ public class ExchangeRatesServlet extends HttpServlet {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             response.getWriter().write("{\"message\": \"Ошибка сервера\"}");
         }
-    }
-
-    private void handleCurrencyExchange(HttpServletRequest request, HttpServletResponse response) throws IOException {
-
     }
 
     @Override
