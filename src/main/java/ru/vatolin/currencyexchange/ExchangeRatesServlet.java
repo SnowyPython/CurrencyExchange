@@ -17,6 +17,7 @@ import java.util.*;
 @WebServlet(urlPatterns = "/api/exchangeRates/*")
 public class ExchangeRatesServlet extends HttpServlet {
     private final ExchangeRateDao exchangeRateDao = new ExchangeRateDao();
+    private final CurrencyDao currencyDao = new CurrencyDao();
 
     @Override
     protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -51,6 +52,38 @@ public class ExchangeRatesServlet extends HttpServlet {
 
                 ExchangeRate rate = exchangeRateDao.getExchangeRate(codes[0], codes[1]);
                 if (rate == null) {
+                    ExchangeRate reverseRate = exchangeRateDao.getExchangeRate(codes[1], codes[0]);
+                    if (reverseRate != null) {
+                        double invertedRate = 1.0/ reverseRate.getRate();
+
+                        Currency baseCurrency = currencyDao.getCurrencyByCode(codes[0]);
+                        Currency targetCurrency = currencyDao.getCurrencyByCode(codes[1]);
+                        rate = new ExchangeRate(
+                                0,
+                                baseCurrency,
+                                targetCurrency,
+                                invertedRate
+                        );
+                    }
+                } else {
+                    ExchangeRate usdToBase = exchangeRateDao.getExchangeRate("USD", codes[0]);
+                    ExchangeRate usdToTarget = exchangeRateDao.getExchangeRate("USD", codes[1]);
+
+                    if (usdToBase != null && usdToTarget != null) {
+                        double calculatedRate = usdToTarget.getRate() / usdToBase.getRate();
+
+                        Currency baseCurrency = currencyDao.getCurrencyByCode(codes[0]);
+                        Currency targetCurrency = currencyDao.getCurrencyByCode(codes[1]);
+                        rate = new ExchangeRate(
+                                0,
+                                baseCurrency,
+                                targetCurrency,
+                                calculatedRate
+                        );
+                    }
+                }
+
+                if (rate == null) {
                     response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                     response.getWriter().write("{\"message\": \"Обменный курс не найден\"}");
                 } else {
@@ -65,7 +98,79 @@ public class ExchangeRatesServlet extends HttpServlet {
     }
 
     private void handleCurrencyExchange(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        String from = request.getParameter("from");
+        String to = request.getParameter("to");
+        String amountStr = request.getParameter("amount");
 
+        if (from == null || to == null || amountStr == null) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().write("{\"message\": \"Отсутствуют необходимые параметры\"}");
+            return;
+        }
+
+        try {
+            double amount = Double.parseDouble(amountStr);
+
+            ExchangeRate rate = exchangeRateDao.getExchangeRate(from.toUpperCase(), to.toUpperCase());
+
+            double rateValue;
+            Currency baseCurrency;
+            Currency targetCurrency;
+
+            if (rate != null) {
+                rateValue = rate.getRate();
+                baseCurrency = currencyDao.getCurrencyByCode(from.toUpperCase());
+                targetCurrency = currencyDao.getCurrencyByCode(to.toUpperCase());
+            } else {
+                ExchangeRate reverseRate = exchangeRateDao.getExchangeRate(to.toUpperCase(), from.toUpperCase());
+                if (reverseRate != null) {
+                    rateValue = 1.0 / reverseRate.getRate();
+                    baseCurrency = currencyDao.getCurrencyByCode(from.toUpperCase());
+                    targetCurrency = currencyDao.getCurrencyByCode(to.toUpperCase());
+                } else {
+                    ExchangeRate rateFromUSD = exchangeRateDao.getExchangeRate("USD", from.toUpperCase());
+                    ExchangeRate rateToUSD = exchangeRateDao.getExchangeRate("USD", to.toUpperCase());
+
+                    if (rateFromUSD != null && rateToUSD != null) {
+                        rateValue = rateToUSD.getRate() / rateFromUSD.getRate();
+                        baseCurrency = currencyDao.getCurrencyByCode(from.toUpperCase());
+                        targetCurrency = currencyDao.getCurrencyByCode(to.toUpperCase());
+                    } else {
+                        response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                        response.getWriter().write("{\"message\": \"Курс обмена не найден\"}");
+                        return;
+                    }
+                }
+            }
+
+            double convertedAmount = rateValue * amount;
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("baseCurrency", Map.of(
+                    "id", baseCurrency.getId(),
+                    "name", baseCurrency.getFullName(),
+                    "code", baseCurrency.getCode(),
+                    "sign", baseCurrency.getSign()
+            ));
+            result.put("targetCurrency", Map.of(
+                    "id", targetCurrency.getId(),
+                    "name", targetCurrency.getFullName(),
+                    "code", targetCurrency.getCode(),
+                    "sign", targetCurrency.getSign()
+            ));
+            result.put("rate", rateValue);
+            result.put("amount", amount);
+            result.put("convertedAmount", convertedAmount);
+
+            response.setStatus(HttpServletResponse.SC_OK);
+            response.getWriter().write(new Gson().toJson(result));
+        } catch (NumberFormatException e) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            response.getWriter().write("{\"message\": \"Некорректное значение amount\"}");
+        } catch (Exception e) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            response.getWriter().write("{\"message\": \"Ошибка сервера\"}");
+        }
     }
 
     @Override
