@@ -1,4 +1,7 @@
-package ru.vatolin.currencyexchange;
+package ru.vatolin.currencyexchange.service;
+
+import ru.vatolin.currencyexchange.model.Currency;
+import ru.vatolin.currencyexchange.model.ExchangeRate;
 
 import java.sql.*;
 import java.util.ArrayList;

@@ -1,5 +1,7 @@
 package ru.vatolin.currencyexchange;
 
+import ru.vatolin.currencyexchange.service.DatabaseConnection;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 

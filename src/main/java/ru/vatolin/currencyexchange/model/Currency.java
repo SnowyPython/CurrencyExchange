@@ -1,4 +1,4 @@
-package ru.vatolin.currencyexchange;
+package ru.vatolin.currencyexchange.model;
 
 public class Currency {
     private int id;

@@ -1,4 +1,4 @@
-package ru.vatolin.currencyexchange;
+package ru.vatolin.currencyexchange.service;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
